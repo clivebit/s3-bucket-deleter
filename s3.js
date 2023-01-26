@@ -14,13 +14,19 @@ const deleteBucket = async Bucket => {
   try {
     console.log(`Deleting ${Bucket}`);
     // We can't delete a bucket before emptying its contents
-    const { Contents } = await s3.listObjects({ Bucket }).promise();
-    if (Contents.length > 0) {
+    let versions = [];
+    let isTruncated = true;
+    while (isTruncated) {
+      const data = await s3.listObjectVersions({ Bucket }).promise();
+      versions = versions.concat(data.Versions);
+      isTruncated = data.IsTruncated;
+    }
+    if (versions.length > 0) {
       await s3
         .deleteObjects({
           Bucket,
           Delete: {
-            Objects: Contents.map(({ Key }) => ({ Key }))
+            Objects: versions.map(({ Key, VersionId }) => ({ Key, VersionId }))
           }
         })
         .promise();
@@ -32,6 +38,7 @@ const deleteBucket = async Bucket => {
     return false;
   }
 };
+
 
 const main = async () => {
   const { Buckets } = await s3.listBuckets().promise();
